@@ -88,6 +88,13 @@ internal sealed class ScopedAIAgent : DelegatingAIAgent
     public UmbracoAIAgent Definition => _definition;
 
     /// <summary>
+    /// Gets the stable identifier of the agent: the Umbraco agent definition's ID, rather than the random
+    /// per-instance ID the inner <see cref="ChatClientAgent"/> generates. This is what the OpenTelemetry
+    /// <c>gen_ai.agent.id</c> attribute carries, so it must not change between runs.
+    /// </summary>
+    protected override string? IdCore => _definition.Id.ToString("N");
+
+    /// <summary>
     /// Gets the human-readable name of the agent.
     /// </summary>
     public override string? Name => _definition.Name;

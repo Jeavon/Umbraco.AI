@@ -1,4 +1,5 @@
 using System.Reflection;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Moq;
 using Shouldly;
@@ -248,11 +249,17 @@ public class AIAgentFactoryToolPermissionTests
 
     private static ChatOptions? ExtractChatOptions(MsAIAgent agent)
     {
-        // agent is ScopedAIAgent : DelegatingAIAgent; InnerAgent is the ChatClientAgent
+        // The factory returns decorators (OpenTelemetryAgent around ScopedAIAgent, both DelegatingAIAgent);
+        // unwrap them until the ChatClientAgent that holds the ChatOptions.
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
-        var innerAgent = agent.GetType().BaseType?
-            .GetProperty("InnerAgent", flags)?
-            .GetValue(agent) as MsAIAgent;
+        MsAIAgent? innerAgent = agent;
+        while (innerAgent is DelegatingAIAgent)
+        {
+            innerAgent = innerAgent.GetType().BaseType?
+                .GetProperty("InnerAgent", flags)?
+                .GetValue(innerAgent) as MsAIAgent;
+        }
+
         if (innerAgent == null) return null;
         return (ChatOptions?)innerAgent.GetType()
             .GetProperty("ChatOptions", flags)?

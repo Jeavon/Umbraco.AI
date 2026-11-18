@@ -9,6 +9,7 @@ using Umbraco.AI.Core.Chat;
 using Umbraco.AI.Core.Models;
 using Umbraco.AI.Core.Profiles;
 using Umbraco.AI.Core.RuntimeContext;
+using Umbraco.AI.Core.Telemetry;
 using Umbraco.AI.Core.Tools;
 using Umbraco.AI.Core.Tools.Scopes;
 using Umbraco.AI.Agent.Extensions;
@@ -100,7 +101,7 @@ internal sealed class AIAgentFactory : IAIAgentFactory
         };
 
         // Wrap in scoped decorator (passes scope provider, contributors, and metadata)
-        return new ScopedAIAgent(
+        var scopedAgent = new ScopedAIAgent(
             innerAgent,
             agent,
             contextItems ?? [],
@@ -108,6 +109,15 @@ internal sealed class AIAgentFactory : IAIAgentFactory
             additionalProperties,
             _runtimeContextScopeProvider,
             _contextContributors);
+
+        // Outermost, so the agent run is the parent of the scope's chat and tool spans. Emits the
+        // gen_ai.agent.* (invoke_agent) span that the Azure portal's Agents views are built from, under the
+        // same source as the chat spans. Zero-cost when no OpenTelemetry listener is configured, and prompt and
+        // response text stay out of the span (EnableSensitiveData is off by default).
+        return scopedAgent
+            .AsBuilder()
+            .UseOpenTelemetry(AITelemetry.SourceName)
+            .Build();
     }
 
     private async Task<MsAIAgent> CreateStandardAgentAsync(
